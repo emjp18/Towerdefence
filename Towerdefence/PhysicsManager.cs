@@ -107,7 +107,7 @@ namespace Towerdefence
             }
             
         }
-        public EDGE FindClosestEdge(WINDING winding, Dictionary<int, Vector2> vertices)
+        public EDGE FindClosestEdge(WINDING winding, List<Vector2> vertices)
         {
             float closestDistance = float.MaxValue;
             Vector2 closestNormal = new Vector2();
@@ -163,10 +163,10 @@ namespace Towerdefence
             WINDING winding;
             if (e0 + e1 + e2 >= 0) winding = WINDING.Clockwise;
             else winding = WINDING.CounterClockwise;
-            Dictionary<int, Vector2> vertices = new Dictionary<int, Vector2>();
-            vertices.Add(0,simplex[0]);
-            vertices.Add(1,simplex[1]);
-            vertices.Add(2,simplex[2]);
+            List<Vector2> vertices = new List<Vector2>();
+            vertices.Add(simplex[0]);
+            vertices.Add(simplex[1]);
+            vertices.Add(simplex[2]);
             int maximumdepth = 32;
             Vector2 intersection = Vector2.Zero;
             for (int i=0; i<maximumdepth;i++)
@@ -181,8 +181,8 @@ namespace Towerdefence
                 }
                 else
                 {
-                    vertices.Remove(edge.closestindex);
-                    vertices.Add(edge.closestindex, support);
+                    
+                    vertices.Add(support);
                 }
             }
 
@@ -223,6 +223,7 @@ namespace Towerdefence
             result2.Y = result.Y;
             return result2;
         }
+        //SAT
         public bool OBBOBBCollision(OBB obbA, OBB obbB)
         {
 
@@ -303,9 +304,19 @@ namespace Towerdefence
 
             return true;
         }
-        public float NonPenetrationConstraint(Vector2 contactPoint, OBB obba, OBB obbb)
+        public float NonPenetrationConstraint(Vector2 contactPoint, OBB obbA, OBB obbB)
         {
-
+            obbA.UpDir.Normalize();
+            obbB.UpDir.Normalize();
+            Vector2 ra = contactPoint - obbA.center;
+            Vector2 rb = contactPoint + obbB.center;
+            float alpha = MathHelper.ToDegrees(MathF.Acos(Vector2.Dot(obbA.UpDir, new Vector2(0, -1))));
+            float beta = MathHelper.ToDegrees(MathF.Acos(Vector2.Dot(obbB.UpDir, new Vector2(0, -1))));
+            Vector2 cp2 = obbB.center - contactPoint;
+            cp2.Normalize();
+            cp2 *= contactPoint.Length();
+            Vector2 n = cp2 - contactPoint;
+            return Vector2.Dot((obbB.center + MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(beta), rb) - obbA.center - MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(alpha), ra)), n);
         }
         public void SequentialImpulse(GameObject[] objects)
         {
