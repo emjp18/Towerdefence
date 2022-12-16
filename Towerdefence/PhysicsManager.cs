@@ -10,8 +10,17 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 namespace Towerdefence
 {
-    public enum WINDING { Clockwise, CounterClockwise};
-
+    
+    
+    public struct PositionConstraint
+    {
+        public Vector3 rb3;
+        public Vector3 ra3;
+        public float beta;
+        public float alpha;
+        public Vector3 n3;
+        public float[,] J;
+    }
     public struct OBB
     {
         public Vector2 TopLeft, BottomLeft, BottomRight, TopRight;
@@ -52,177 +61,7 @@ namespace Towerdefence
             obbC.center = obbC.TopLeft + new Vector2(obbC.Width, obbC.Height) * 0.5f;
             return obbC;
         }
-        public void EvolveSimplex(OBB obbA, OBB obbB,ref Vector2[] simplex, Vector2 direction, ref bool foundOrigin)
-        {
-            
-
-            Vector2 a = simplex[2];
-            Vector2 b = simplex[1];
-            Vector2 c = simplex[0];
-
-            Vector2 a0 = a * -1; // v2 to the origin
-            Vector2 ab = b - a; // v2 to v1
-            Vector2 ac = c - a; // v2 to v0
-
-            Vector2 abPerp = TripleCrossProduct(ac, ab, ab);
-            Vector2 acPerp = TripleCrossProduct(ab, ac, ac);
-
-            
-            if (Vector2.Dot(abPerp, a0) > 0)
-            {
-
-                direction = abPerp;
-                simplex[0] = Support(obbA, obbA, direction);
-                Vector2 test = Support(obbA, obbA, direction);
-                if (Vector2.Dot(direction, test) >= 0)
-                {
-                    EvolveSimplex(obbA, obbB,ref simplex, direction, ref foundOrigin);
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else if (Vector2.Dot(acPerp, a0) > 0)
-            {
-                direction = abPerp;
-                simplex[1] = Support(obbA, obbA, direction);
-                Vector2 test = Support(obbA, obbA, direction);
-                if (Vector2.Dot(direction, test) >= 0)
-                {
-                    EvolveSimplex(obbA, obbB,ref simplex, direction,ref foundOrigin);
-                }
-                else
-                {
-                    return;
-                }
-            }
-            else
-            {
-
-                foundOrigin = true;
-                return;
-
-
-            }
-            
-        }
-        public EDGE FindClosestEdge(WINDING winding, List<Vector2> vertices)
-        {
-            float closestDistance = float.MaxValue;
-            Vector2 closestNormal = new Vector2();
-            int closestIndex = 0;
-            Vector2 edge = new Vector2();
-
-
-            for (int i = 0; i < vertices.Count; i++)
-            {
-                int j = i + 1;
-                if (j >= vertices.Count) j = 0;
-
-                edge = vertices[i] - vertices[j];
-                Vector2 norm = Vector2.Zero;
-                switch (winding)
-                {
-                    case WINDING.Clockwise:
-                        norm = new Vector2(edge.Y, -edge.X);
-                        break;
-                    case WINDING.CounterClockwise:
-                        norm = new Vector2(-edge.Y, edge.X);
-                        break;
-                }
-                norm.Normalize();
-
-                float dist = Vector2.Dot(norm, vertices[i]);
-
-                if (dist < closestDistance)
-                {
-                    closestDistance = dist;
-                    closestNormal = norm;
-                    closestIndex = j;
-
-                }
-
-            }
-            EDGE e = new EDGE();
-            e.closestdistance= closestDistance;
-            e.closestnormal = closestNormal;
-            e.closestindex = closestIndex;
-            return e;
-        }
-        public Vector2 Support(OBB obbA, OBB obbB, Vector2 direction)
-        {
-            return obbA.center + (direction * (obbA.TopLeft - obbA.BottomRight).Length() * 0.5f) -
-                obbB.center + (-direction * (obbB.TopLeft - obbB.BottomRight).Length() * 0.5f);
-        }
-        public Vector2 EPA(OBB obba, OBB obbb, Vector2[] simplex)
-        {
-            float e0 = (simplex[1].X - simplex[0].X) * (simplex[1].Y + simplex[0].Y);
-            float e1 = (simplex[2].X - simplex[1].X) * (simplex[2].Y + simplex[1].Y);
-            float e2 = (simplex[0].X - simplex[2].X) * (simplex[0].Y + simplex[2].Y);
-            WINDING winding;
-            if (e0 + e1 + e2 >= 0) winding = WINDING.Clockwise;
-            else winding = WINDING.CounterClockwise;
-            List<Vector2> vertices = new List<Vector2>();
-            vertices.Add(simplex[0]);
-            vertices.Add(simplex[1]);
-            vertices.Add(simplex[2]);
-            int maximumdepth = 32;
-            Vector2 intersection = Vector2.Zero;
-            for (int i=0; i<maximumdepth;i++)
-            {
-                EDGE edge = FindClosestEdge(winding, vertices);
-                Vector2 support = Support(obba, obbb, edge.closestnormal);
-                float distance = Vector2.Dot(support, edge.closestnormal);
-                intersection = edge.closestnormal * distance;
-                if (Math.Abs(distance - edge.closestdistance) <= float.Epsilon)
-                {
-                    return intersection;
-                }
-                else
-                {
-                    
-                    vertices.Add(support);
-                }
-            }
-
-            return intersection;
-
-        }
-        public bool GJK(OBB obbA, OBB obbB, ref Vector2 intersectionpoint)
-        {
-          
-            Vector2[] simplex = new Vector2[3];
-            Vector2 direction = obbA.center - obbB.center;
-            direction.Normalize();
-            simplex[0] = Support(obbA, obbA, direction);
-
-            direction *= -1;
-
-            simplex[1] = Support(obbA, obbA, direction);
-
-            Vector2 cb = direction * -1 - direction;
-            Vector2 c0 = simplex[1];
-            simplex[2] = TripleCrossProduct(cb, c0, cb);
-            bool foundOrigin = false;
-            EvolveSimplex(obbA, obbB, ref simplex, direction, ref foundOrigin);
-            if(foundOrigin)
-                intersectionpoint = EPA(obbA, obbB, simplex);
-
-            return foundOrigin;
-        }
-        //A cheating way of getting a perpedincular line in 2d.
-        public Vector2 TripleCrossProduct(Vector2 a , Vector2 b ,Vector2 c)
-        {
-            Vector3 a3 = new Vector3(a.X, a.Y, 0);
-            Vector3 b3 = new Vector3(b.X, b.Y, 0);
-            Vector3 c3 = new Vector3(c.X, c.Y, 0);
-            Vector3 result = Vector3.Cross(Vector3.Cross(a3, b3), c3);
-            Vector2 result2 = new Vector2();
-            result2.X = result.X;
-            result2.Y = result.Y;
-            return result2;
-        }
+       
         //SAT
         public bool OBBOBBCollision(OBB obbA, OBB obbB)
         {
@@ -304,29 +143,321 @@ namespace Towerdefence
 
             return true;
         }
-        public float NonPenetrationConstraint(Vector2 contactPoint, OBB obbA, OBB obbB)
+       
+        public void SequentialImpulse(GameObject o, PositionConstraint constraint)
         {
+            /*
+             * A = J @ M @ J.T 
+             B = -q - J @ V
+
+             l = B / A
+             */
+
+            float[,] Minv = o.GetInvMassMatrix();
+            float[,] JT = constraint.J;
+            float[,] A = new float[4, 4] { { }, { }, { }, { } }
+        }
+        public bool Line(ref List<Vector2> simplex, ref Vector2 direction)
+        {
+            Vector2 a = simplex[0];
+            Vector2 b = simplex[1];
+            Vector2 ab = b - a;
+            Vector2 ao = -a;
+            if (SameDirection(ab, ao))
+            {
+                Vector3 ab3 = new Vector3(ab.X, ab.Y, 0);
+                Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
+                Vector3 cross = MatrixMath.Cross(ab3, ao3);
+                Vector3 dir3 = MatrixMath.Cross(cross, ab3);
+                direction.X = dir3.X;
+                direction.Y = dir3.Y;
+            }
+            else
+            {
+                simplex.Clear();
+                simplex.Add(a);
+                direction = ao;
+
+            }
+
+            return false;
+        }
+        public bool SameDirection(
+             Vector2 direction,
+             Vector2 ao)
+        {
+            return Vector2.Dot(direction, ao) > 0;
+        }
+        public bool Triangle(ref List<Vector2> simplex, ref Vector2 direction)
+        {
+            Vector2 a = simplex[0];
+            Vector2 b = simplex[1];
+            Vector2 c = simplex[2];
+
+            Vector2 ab = b - a;
+            Vector2 ac = c - a;
+            Vector2 ao = -a;
+            Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
+            Vector3 ab3 = new Vector3(ab.X, ab.Y, 0);
+            Vector3 ac3 = new Vector3(ac.X, ac.Y, 0);
+            Vector3 abc = Vector3.Cross(ab3, ac3);
+            Vector3 cross = Vector3.Cross(abc, ac3);
+            if (SameDirection(new Vector2(cross.X, cross.Y), ao))
+            {
+                if (SameDirection(ac, ao))
+                {
+                    simplex.Clear();
+                    simplex.Add(a);
+                    simplex.Add(c);
+
+                    cross = Vector3.Cross(Vector3.Cross(ac3, ao3), ac3);
+                    direction = new Vector2(cross.X, cross.Y);
+                }
+                else
+                {
+                    simplex.Clear();
+                    simplex.Add(a);
+                    simplex.Add(b);
+                    return Line(ref simplex, ref direction);
+                }
+            }
+            else
+            {
+                cross = Vector3.Cross(Vector3.Cross(ab3, abc), ao3);
+                if (SameDirection(new Vector2(cross.X, cross.Y), ao))
+                {
+                    simplex.Clear();
+                    simplex.Add(a);
+                    simplex.Add(b);
+
+
+                    return Line(ref simplex, ref direction);
+                }
+                else
+                {
+                    if (SameDirection(new Vector2(abc.X, abc.Y), ao))
+                    {
+                        direction = new Vector2(abc.X, abc.Y);
+                    }
+                    else
+                    {
+                        simplex.Clear();
+                        simplex.Add(a);
+                        simplex.Add(c);
+                        simplex.Add(b);
+                        direction = new Vector2(-abc.X, -abc.Y);
+                    }
+                }
+            }
+            return true;
+        }
+        public bool EvolveSimplex(OBB obbA, OBB obbB, ref List<Vector2> simplex, ref Vector2 direction)
+        {
+
+            switch (simplex.Count)
+            {
+                case 2:
+                    {
+                        return Line(ref simplex, ref direction);
+
+                    }
+                case 3:
+                    {
+                        return Triangle(ref simplex, ref direction);
+                    }
+            }
+            return false;
+
+
+        }
+        public Vector2 Support(OBB obbA, OBB obbB, Vector2 direction)
+        {
+            float maxA = float.MinValue;
+            float maxB = float.MinValue;
+            Vector2[] pointsA = new Vector2[4];
+            pointsA[0] = obbA.TopLeft;
+            pointsA[1] = obbA.TopRight;
+            pointsA[2] = obbA.BottomLeft;
+            pointsA[3] = obbA.BottomRight;
+            Vector2[] pointsB = new Vector2[4];
+            pointsB[0] = obbB.TopLeft;
+            pointsB[1] = obbB.TopRight;
+            pointsB[2] = obbB.BottomLeft;
+            pointsB[3] = obbB.BottomRight;
+            Vector2 a = Vector2.Zero;
+            Vector2 b = Vector2.Zero;
+            for (int i = 0; i < 4; i++)
+            {
+                float dotA = Vector2.Dot(pointsA[i], direction);
+                if (dotA > maxA)
+                {
+                    maxA = dotA;
+                    a = pointsA[i];
+                }
+                float dotB = Vector2.Dot(pointsB[i], -direction);
+                if (dotB > maxB)
+                {
+                    maxB = dotB;
+                    b = pointsB[i];
+                }
+            }
+
+
+
+            return a - b;
+
+        }
+        public PositionConstraint GetPositionConstraint(OBB obbA, OBB obbB, Vector2 mtv)
+        {
+            PositionConstraint pc = new PositionConstraint();
+            Vector2 contactpointA = obbA.center - mtv;
+            Vector2 contactpointB = -contactpointA;
             obbA.UpDir.Normalize();
             obbB.UpDir.Normalize();
-            Vector2 ra = contactPoint - obbA.center;
-            Vector2 rb = contactPoint + obbB.center;
+            Vector2 ra = contactpointA - obbA.center;
+            Vector2 rb = contactpointB - obbB.center;
             float alpha = MathHelper.ToDegrees(MathF.Acos(Vector2.Dot(obbA.UpDir, new Vector2(0, -1))));
             float beta = MathHelper.ToDegrees(MathF.Acos(Vector2.Dot(obbB.UpDir, new Vector2(0, -1))));
-            Vector2 cp2 = obbB.center - contactPoint;
-            cp2.Normalize();
-            cp2 *= contactPoint.Length();
-            Vector2 n = cp2 - contactPoint;
-            return Vector2.Dot((obbB.center + MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(beta), rb) - obbA.center - MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(alpha), ra)), n);
+            Vector2 n = contactpointB - contactpointA;
+            n.Normalize();
+            //float c = Vector2.Dot((obbB.center + MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(beta), rb)
+            //     - obbA.center - MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(alpha), ra)), n);
+
+            //J = np.hstack((-n, np.cross(ra, n), n, -np.cross(rb, n)))
+            Vector3 ra3 = new Vector3(ra.X, ra.Y, 0);
+            Vector3 rb3 = new Vector3(rb.X, rb.Y, 0);
+            Vector3 n3 = new Vector3(n.X, n.Y, 0);
+            Vector3 ra3crn3 = Vector3.Cross(ra3, n3);
+            Vector3 rb3crn3 = Vector3.Cross(rb3, n3);
+            float[,] J = new float[4, 3]{ { n3.X,n3.Y,0},{ ra3crn3.X, ra3crn3.Y, ra3crn3.Z },
+                { -n3.X, -n3.Y, 0 },{-rb3crn3.X,-rb3crn3.Y,-rb3crn3.Z } };
+
+            pc.ra3 = ra3;
+            pc.J = J;
+            pc.beta = beta;
+            pc.alpha = alpha;
+            pc.n3 = n3;
+            pc.rb3 = rb3;
+            return pc;
         }
-        public void SequentialImpulse(GameObject[] objects)
+        public bool GJK(OBB obbA, OBB obbB)
         {
-            for(int i=0; i<objects.Count();i++)
+            List<Vector2> simplex = new List<Vector2>();
+
+            Vector2 direction = new Vector2(1, 0);
+            Vector2 startsupport = Support(obbA, obbB, direction);
+
+            simplex.Add(startsupport);
+
+            direction = -startsupport;
+            bool colliding = false;
+            while (true)
             {
-               
+                
+                Vector2 support = Support(obbA, obbB, direction);
+                if (Vector2.Dot(support, direction) <= 0)
+                {
+                    break;
+                }
+                List<Vector2> simplexCopy = new List<Vector2>();
+                foreach (Vector2 point in simplex)
+                {
+                    simplexCopy.Add(point);
+                }
+
+                simplex.Clear();
+                simplex.Add(support);
+                foreach (Vector2 point in simplexCopy)
+                {
+                    simplex.Add(point);
+                }
+
+                if (EvolveSimplex(obbA, obbB, ref simplex, ref direction))
+                {
+                    colliding = true;
+                    break;
+                }
+
             }
+            if (colliding)
+            {
+                EPA(obbA, obbB, simplex);
+                
+            }
+
+            return colliding;
+
+
+        }
+        public Vector2 EPA(OBB obba, OBB obbb, List<Vector2> simplex)
+        {
+            int minIndex = 0;
+            float minDistance = float.MaxValue;
+            Vector2 minNormal = new Vector2();
+
+            while (minDistance == float.MaxValue)
+            {
+                for (int i = 0; i < simplex.Count; i++)
+                {
+                    int j = (i + 1) % simplex.Count;
+
+                    Vector2 vertexI = simplex[i];
+                    Vector2 vertexJ = simplex[j];
+
+                    Vector2 ij = vertexJ - vertexI;
+
+                    Vector2 normal = new Vector2(ij.Y, -ij.X);
+                    normal.Normalize();
+                    float distance = Vector2.Dot(normal, vertexI);
+
+                    if (distance < 0)
+                    {
+                        distance *= -1;
+                        normal *= -1;
+                    }
+
+                    if (distance < minDistance)
+                    {
+                        minDistance = distance;
+                        minNormal = normal;
+                        minIndex = j;
+                    }
+                    Vector2 support = Support(obba, obbb, minNormal);
+                    float sDistance = Vector2.Dot(minNormal, support);
+
+                    if (MathF.Abs(sDistance - minDistance) > 0.001)
+                    {
+                        minDistance = float.MaxValue;
+
+                        List<Vector2> simplexCopy = new List<Vector2>();
+                        foreach (Vector2 point in simplex)
+                        {
+                            simplexCopy.Add(point);
+                        }
+
+                        simplex.Clear();
+
+                        for (int k = 0; k < simplexCopy.Count; k++)
+                        {
+                            if (k == minIndex)
+                                simplex.Add(support);
+
+                            simplex.Add(simplexCopy[k]);
+                        }
+
+
+
+
+                    }
+
+                }
+
+            }
+            return minNormal * (minDistance + 0.001f);
         }
     }
 }
+
 /*
  * Sequential impulses do not use a monolith system, constraints are solved individually.
  * 1. apply forces to velocities

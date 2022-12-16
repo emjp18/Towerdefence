@@ -123,6 +123,24 @@ namespace Towerdefence
             scaledM[2, 2]=scaledM[2, 2]*scalar;
             return scaledM;
         }
+        public static Vector4 TransformVector4x3(float[,] m, Vector3 vec)
+        {
+            Vector4 v4 = new Vector4();
+            v4.X = m[0, 0] * vec.X + m[0, 1] * vec.Y + m[0, 2] * vec.Z;
+            v4.Y = m[1, 0] * vec.X + m[1, 1] * vec.Y + m[1, 2] * vec.Z;
+            v4.Z = m[2, 0] * vec.X + m[2, 1] * vec.Y + m[2, 2] * vec.Z;
+            v4.W = m[3, 0] * vec.X + m[3, 1] * vec.Y + m[3, 2] * vec.Z;
+            return v4;
+        }
+        public static Vector3 Cross(Vector3 u, Vector3 v)
+        {
+            //\left(u_2v_3-u_3v_2,\:u_3v_1-u_1v_3,\:u_1v_2-u_2v_1\right)
+            Vector3 result = new Vector3();
+            result.X = u.Y * v.Z - u.Z * v.Y;
+            result.Y = u.Z * v.X - u.X * v.Z;
+            result.Z = u.X * v.Y - u.Y * v.X;
+            return result;
+        }
         public static float[,] Transposed3x3(float[,] m)
         {
             float[,] transposed = new float[3, 3];
@@ -135,6 +153,23 @@ namespace Towerdefence
             transposed[0, 2] = m[2,0];
             transposed[1, 2] = m[2,1];
             transposed[2, 2] = m[2,2];
+            return transposed;
+        }
+        public static float[,] Transposed4x3(float[,] m)
+        {
+            float[,] transposed = new float[3, 4];
+            transposed[0, 0] = m[0, 0];
+            transposed[1, 0] = m[0, 1];
+            transposed[2, 0] = m[0, 2];
+            transposed[0, 1] = m[1, 0];
+            transposed[1, 1] = m[1, 1];
+            transposed[2, 1] = m[1, 2];
+            transposed[0, 2] = m[2, 0];
+            transposed[1, 2] = m[2, 1];
+            transposed[2, 2] = m[2, 2];
+            transposed[0, 3] = m[3, 0];
+            transposed[1, 3] = m[3, 1];
+            transposed[2, 3] = m[3, 2];
             return transposed;
         }
     }
