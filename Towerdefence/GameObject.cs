@@ -30,21 +30,24 @@ namespace Towerdefence
         Vector2 contactNormal;
         Vector2 contactPoint;
         Vector2 r;
-        public GameObject(string tex, Rectangle rect,float mass, float speed = 0 ) 
+        OBB obb;
+        public GameObject(string tex, Rectangle rect,float mass, int id, float speed = 0 ) 
         {
+
             this.pos = rect.Location.ToVector2();
             this.rect = rect;
             this.mass = mass;
             //assumes all bounds are circles
             //Ix = Iy = π/4 * radius⁴
             //
+            this.ID = id;
             radius = MathF.Sqrt(rect.Width * rect.Width + rect.Height * rect.Height);
             radius /= 2;
             this.speed = speed;
             //inertia = MathF.PI / 4 * radius;
             ////Assumes all bounds are rectangles
             inertia = 1f / 12f * mass * ( (rect.Height * rect.Height) + (rect.Width * rect.Width));
-
+            obb.Width = rect.Width; obb.Height = rect.Height;
             r = new Vector2(rect.Width / 2.0f, rect.Height / 2.0f);
             massMatrix[0, 0] = mass;
             massMatrix[0, 1] = 0;
@@ -77,8 +80,18 @@ namespace Towerdefence
             {
                 invinertiaMatrix = MatrixMath.Inverse3x3(inertiaMatrix);
             }
+            ResourceManager.SetGO(this);
+
+            obb.center = pos;
+            obb.UpDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitY);
+            obb.LeftDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitX);
+            obb.BottomRight = obb.center - obb.UpDir * (obb.Height * 0.5f) - obb.LeftDir * (obb.Width * 0.5f);
+            obb.BottomLeft = obb.center - obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
+            obb.TopLeft = obb.center + obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
+            obb.TopRight = obb.center + obb.UpDir * (obb.Height * 0.5f) - obb.LeftDir * (obb.Width * 0.5f);
 
         }
+        public float GetOrientation() { return orientation; }
         public Vector2 GetVelocity() { return velocity; }
         public float GetAngularVelocity() { return angularVelocity; }
         public float[,] GetInvIntertiaMatrix() { return invinertiaMatrix; }
@@ -102,32 +115,41 @@ namespace Towerdefence
       public Rectangle GetRectangle() { return rect; }
         public float GetRadius() { return radius; }
         public Vector3 GetF() { return new Vector3(force.X, force.Y, torque); }
-        //public void AddTorque(Vector2 f, Vector2 contactpoint)
-        //{
-        //    Vector2 r = contactpoint - rect.Center.ToVector2();
-        //    float angle = MathF.Acos(Vector2.Dot(r,f) / r.Length() * f.Length());
-        //    angle *= 180 / MathF.PI;
-        //    torque+=r.Length() * f.Length() * MathF.Sin(angle);
-        //}
+        
         public void AddForce(Vector2 force)
         {
             //must happen before the collision function.
             this.force += force;
 
-            torque += r.X * force.Y - r.Y * force.X;
+            //torque += r.X * force.Y - r.Y * force.X;
+        }
+        public void AddTorque(float t)
+        {
+            torque+= t;
         }
         public Vector2 GetPos() { return pos; }
+        public OBB getOBB() { return obb; }
         public virtual void Update(GameTime gametime)
         {
             float dt = (float)gametime.ElapsedGameTime.TotalSeconds;
-            velocity += force / mass * dt;
+            Vector2 linearAcceleration = force / mass;
+            velocity += linearAcceleration * dt;
             pos += velocity * dt;
             float angularAcceleration = torque / inertia;
             angularVelocity += angularAcceleration * dt;
             orientation += angularVelocity * dt;
             force = Vector2.Zero;
             torque = 0;
+
+            obb.center = pos;
+            obb.UpDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitY);
+            obb.LeftDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitX);
+            obb.BottomRight = obb.center - obb.UpDir * (obb.Height * 0.5f)- obb.LeftDir * (obb.Width * 0.5f);
+            obb.BottomLeft = obb.center - obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
+            obb.TopLeft = obb.center + obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
+            obb.TopRight = obb.center + obb.UpDir * (obb.Height * 0.5f) - obb.LeftDir * (obb.Width * 0.5f);
         }
+       
         public virtual void Draw(SpriteBatch sb)
         {
             sb.Draw(tex, rect, new Rectangle(0, 0, rect.Width, rect.Height), Color.White,

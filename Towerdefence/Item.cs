@@ -10,8 +10,8 @@ namespace Towerdefence
     internal class Item : GameObject
     {
        
-        public Item(string tex, Rectangle rect, float mass, float speed)
-        : base(tex, rect, mass, speed)
+        public Item(string tex, Rectangle rect, float mass, float speed, int id)
+        : base(tex, rect, mass,id, speed)
         {
             
         }

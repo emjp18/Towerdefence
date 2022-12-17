@@ -339,5 +339,17 @@ namespace Towerdefence
             transposed[2, 3] = m[3, 2];
             return transposed;
         }
+        public static float Cross(Vector2 v1, Vector2 v2)
+        {
+            return v1.X * v2.Y - v1.Y * v2.X;
+        }
+
+        // Cross Product between Vector and Scalar - Counterclockwise Direction
+        public static Vector2 Cross(Vector2 v, float s)
+        {
+            return new Vector2(s * v.Y, -s * v.X);
+        }
     }
+
+    
 }

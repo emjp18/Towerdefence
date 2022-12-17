@@ -29,6 +29,20 @@ namespace Towerdefence
         public Vector2 ra2;
         public float d;
         public float accum;
+        public float massNormal;
+        public float massTangent;
+        public float bias;
+        public float restitution;
+        public Vector2 velocityA;
+        public Vector2 VelocityB;
+        public float anglularVelA;
+        public float angularVelB;
+        public float massA;
+        public float massB;
+        public float inertiaA;
+        public float inertiaB;
+        public int IDA;
+        public int IDB;
     }
     public struct OBB
     {
@@ -46,7 +60,8 @@ namespace Towerdefence
 
     internal class PhysicsManager
     {
-        float b = float.Epsilon;
+        List<PositionConstraint> constraints = new List<PositionConstraint>();
+        public int numIterations = 10;
         public bool CircleCircleCollision(ref GameObject a, ref GameObject b)
         {
             float x = a.GetRectangle().Center.X - b.GetRectangle().Center.X;
@@ -152,59 +167,117 @@ namespace Towerdefence
 
             return true;
         }
-       
-        public void Impulse(GameObject a,GameObject b ,ref PositionConstraint constraint, float dt)
+      
+    public void SequentialImpulse(float dt, GameObject a, GameObject b)
         {
-            if (constraint.d >= 0)
-                return;
-           
-            float bias = 0.5f / dt * constraint.penetrationdepth;
-
-            float kNormal = a.GetInvMassMatrix()[0, 0] + b.GetInvMassMatrix()[0, 0];
-            Vector3 rnA = Vector3.Cross(constraint.ra3, constraint.n3);
-            Vector3 rnB = Vector3.Cross(constraint.rb3, constraint.n3);
-            kNormal += Vector3.Dot(a.GetInvIntertiaMatrix()[0, 0] * rnA, rnA) + Vector3.Dot(b.GetInvIntertiaMatrix()[0, 0] * rnB, rnB);
-            Vector3 v1 = new Vector3(a.GetVelocity().X, a.GetVelocity().Y, a.GetAngularVelocity());
-            Vector3 v2 = new Vector3(b.GetVelocity().X, b.GetVelocity().Y, b.GetAngularVelocity());
-            // Save inverse of J(M^-1)(J^T).
-            float normalmass = 1.0f / kNormal;
-
-            Vector2 dv = (b.GetVelocity()+constraint.rb2 - a.GetVelocity()-constraint.ra2);
-               
-
-            float jnV = Vector2.Dot(dv, constraint.n2);// dv.dot(normal);
-            float vinitial = Vector3.Dot(v1 - v2, constraint.n3);
-            float vfinal = jnV + bias;
-            float restitution = vfinal / vinitial;
-
-            float lambda = -jnV + 0.5f / dt + (-restitution * (jnV)) * normalmass;
-
-            float oldAccumI = constraint.accum;
-            constraint.accum += lambda;
-
-            if (constraint.accum < 0)
-            {
-                constraint.accum = 0;
-            }
-            // Find real lambda
-            float I = constraint.accum - oldAccumI;
-
-            // Calculate linear impulse
-            Vector2 nLinearI = constraint.n2 * I;
-
-            // Calculate angular impulse
-
-            Vector3 nAngularIA = rnA * I;
-            Vector3 nAngularIB = rnB * I;
-
-            // Apply linear impulse
-            a.AddForce(-a.GetInvMassMatrix()[0, 0] * nLinearI);
-            b.AddForce(b.GetInvMassMatrix()[0, 0] * nLinearI);
+            
 
             
 
+            float k_slop = 0.004f;
+            float k_biasFactor = 0.1f;
+            for(int j=0; j<numIterations; j++)
+            {
+                for (int i = 0; i < constraints.Count; i++)
+                {
+                    PositionConstraint c = constraints[i];
+                    if (c.d >= 0)
+                        continue;
+                    Vector2 ra = c.ra2;
+                    Vector2 rb = c.rb2;
+
+                    float invMassA = 1.0f / c.massA;
+                    float invMassB = 1.0f / c.massB;
+                    float massLinear = invMassA + invMassB;
+                    float invIA = 1.0f / c.inertiaA;
+                    float invIB = 1.0f / c.inertiaB;
+
+                    c.massNormal = massLinear + MathF.Pow(MatrixMath.Cross(c.n2, ra), 2) * invIA + MathF.Pow(
+                        MatrixMath.Cross(c.n2, rb), 2) * invIB;
+
+                    c.massNormal = 1.0f / c.massNormal;
+
+                    c.massTangent = massLinear + MathF.Pow(Vector2.Dot(c.n2, ra), 2) * invIA + MathF.Pow(
+                        Vector2.Dot(c.n2, rb), 2) * invIB; // Cross(tangent, r)^2 = Dot(normal, r)^2 : in 2D
+
+                    c.massTangent = 1.0f / c.massTangent;
+
+                    Vector2 dv = c.VelocityB + MatrixMath.Cross(rb, c.angularVelB) - c.velocityA
+                        - MatrixMath.Cross(ra, c.anglularVelA);
+
+                    float vn = Vector2.Dot(dv, c.n2);
+                    float maxrestitution = 0.3f;
+                    c.restitution = vn < -1.0f ? vn * maxrestitution : 0.0f;
+
+                    c.bias = MathF.Min(0.0f, c.penetrationdepth + k_slop) * k_biasFactor / dt;
+
+
+                    float nLambda = (-vn + c.bias + c.restitution) * c.massNormal;
+
+                    float oldAccumI = c.accum;
+                    c.accum += nLambda;
+
+                    if (c.accum < 0)
+                    {
+                        c.accum = 0;
+                    }
+                    // Find real lambda
+                    float I = c.accum - oldAccumI;
+
+                    // Calculate linear impulse
+                    Vector2 nLinearI = c.n2 * I;
+
+                    // Calculate angular impulse
+                    float rnA = MatrixMath.Cross(c.ra2, c.n2);
+                    float rnB = MatrixMath.Cross(c.rb2, c.n2);
+                    float nAngularIA = rnA * I;
+                    float nAngularIB = rnB * I;
+
+                    // Apply linear impulse
+                    a.AddForce(-invMassA * nLinearI);
+                    b.AddForce(invMassB * nLinearI);
+
+                    //// Apply angular impulse
+                    a.AddTorque(-invIA * nAngularIA);
+                    b.AddTorque(invIB * nAngularIB);
+                    constraints[i] = c;
+
+                }
+
+            }
+            constraints.Clear();
+
+
+            /*
+             * 
+                             * Equation: A = J * M⁻¹ * Jt
+
+                * Jt = transposed Jacobian
+
+                * Only in 2D the inverse effective mass is =
+
+                                 J                                M⁻¹                       Jt
+                [nx, ny, n X ra, -nx, -ny, -n X rb] |m1⁻¹  0      0     0     0       0| | nx    |
+                                                    |0     m1⁻¹   0     0     0       0| | ny    |
+                                                    |0     0      I1⁻¹  0     0       0| | n X ra|  
+                                                    |0     0      0     m2⁻¹  0       0| |-nx    |  
+                                                    |0     0      0     0     m2⁻¹    0| |-ny    |    
+                                                    |0     0      0     0     0    I2⁻¹| |-n X rb|
+             * 
+             */
+
+
+
+
+
+
+
+
+
+
+
         }
-        
+
         public bool Line(ref List<Vector2> simplex, ref Vector2 direction)
         {
             Vector2 a = simplex[0];
@@ -355,7 +428,7 @@ namespace Towerdefence
             return a - b;
 
         }
-        public PositionConstraint GetPositionConstraint(OBB obbA, OBB obbB, Vector2 mtv)
+        public PositionConstraint CreatePositionConstraint(OBB obbA, OBB obbB, GameObject a, GameObject b,Vector2 mtv)
         {
             PositionConstraint pc = new PositionConstraint();
             Vector2 contactpointA = obbA.center - mtv;
@@ -393,14 +466,22 @@ namespace Towerdefence
             pc.rb2 = rb;
             pc.d = Vector2.Dot(((obbA.center + ra) - obbB.center + rb), n);
             pc.accum = 0;
+            pc.velocityA = a.GetVelocity();
+            pc.VelocityB = b.GetVelocity();
+            pc.anglularVelA = a.GetAngularVelocity();
+            pc.angularVelB = b.GetAngularVelocity();
+            pc.massA = a.Getmass();
+            pc.massB = b.Getmass();
+            pc.inertiaA = a.GetInertia();
+            pc.inertiaB = b.GetInertia();
             return pc;
         }
-        public bool GJK(OBB obbA, OBB obbB)
+        public bool GJK(GameObject a, GameObject b)
         {
             List<Vector2> simplex = new List<Vector2>();
-
+            
             Vector2 direction = new Vector2(1, 0);
-            Vector2 startsupport = Support(obbA, obbB, direction);
+            Vector2 startsupport = Support(a.getOBB(), b.getOBB(), direction);
 
             simplex.Add(startsupport);
 
@@ -409,7 +490,7 @@ namespace Towerdefence
             while (true)
             {
                 
-                Vector2 support = Support(obbA, obbB, direction);
+                Vector2 support = Support(a.getOBB(), b.getOBB(), direction);
                 if (Vector2.Dot(support, direction) <= 0)
                 {
                     break;
@@ -427,7 +508,7 @@ namespace Towerdefence
                     simplex.Add(point);
                 }
 
-                if (EvolveSimplex(obbA, obbB, ref simplex, ref direction))
+                if (EvolveSimplex(a.getOBB(), b.getOBB(), ref simplex, ref direction))
                 {
                     colliding = true;
                     break;
@@ -436,14 +517,15 @@ namespace Towerdefence
             }
             if (colliding)
             {
-                EPA(obbA, obbB, simplex);
-                
+                Vector2 mtv = EPA(a.getOBB(), b.getOBB(), simplex);
+                constraints.Add(CreatePositionConstraint(a.getOBB(), b.getOBB(),a,b, mtv));
             }
 
             return colliding;
 
 
         }
+        
         public Vector2 EPA(OBB obba, OBB obbb, List<Vector2> simplex)
         {
             int minIndex = 0;
