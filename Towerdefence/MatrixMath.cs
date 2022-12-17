@@ -112,15 +112,15 @@ namespace Towerdefence
         public static float[,] ScaleMatrix(float[,] m, float scalar)
         {
             float[,] scaledM = new float[3, 3];
-            scaledM[0, 0] = scaledM[0, 0] * scalar;
-            scaledM[1, 0]=scaledM[1, 0]*scalar;
-            scaledM[2, 0]=scaledM[2, 0]*scalar;
-            scaledM[0, 1]=scaledM[0, 1]*scalar;
-            scaledM[1, 1]=scaledM[1, 1]*scalar;
-            scaledM[2, 1]=scaledM[2, 1]*scalar;
-            scaledM[0, 2]=scaledM[0, 2]*scalar;
-            scaledM[1, 2]=scaledM[1, 2]*scalar;
-            scaledM[2, 2]=scaledM[2, 2]*scalar;
+            scaledM[0, 0] = m[0, 0] * scalar;
+            scaledM[1, 0]= m[1, 0]*scalar;
+            scaledM[2, 0]=m[2, 0]*scalar;
+            scaledM[0, 1]=m[0, 1]*scalar;
+            scaledM[1, 1]=m[1, 1]*scalar;
+            scaledM[2, 1]=m[2, 1]*scalar;
+            scaledM[0, 2]=m[0, 2]*scalar;
+            scaledM[1, 2]=m[1, 2]*scalar;
+            scaledM[2, 2]=m[2, 2]*scalar;
             return scaledM;
         }
         public static Vector4 TransformVector4x3(float[,] m, Vector3 vec)
@@ -131,6 +131,173 @@ namespace Towerdefence
             v4.Z = m[2, 0] * vec.X + m[2, 1] * vec.Y + m[2, 2] * vec.Z;
             v4.W = m[3, 0] * vec.X + m[3, 1] * vec.Y + m[3, 2] * vec.Z;
             return v4;
+        }
+        //Vector 1x12, matrix 12x1
+        public static float[,] TransformVector12x1(float[,] m, float[,] vec)
+        {
+            ////-(J*V+b)/J*M*JT
+            float[,] mat = new float[12, 12];
+
+            for(int row=0; row<12; row++)
+            {
+                for(int col=0; col<12; col++)
+                {
+                    mat[row, col] = 0;
+                    
+                }
+            }
+            for (int row = 0; row < 12; row++)
+            {
+                for (int col = 0; col < 12; col++)
+                {
+                 
+                    mat[row, col] += m[row, 0] * vec[0, col];
+                }
+            }
+            return mat;
+        }
+        public static float[,] MultiplyMatrixGeneric(float[,] A, float[,] B)
+        {
+            ////-(J*V+b)/J*M*JT
+           
+
+            int rA = A.GetLength(0);
+            int cA = A.GetLength(1);
+            int rB = B.GetLength(0);
+            int cB = B.GetLength(1);
+            if (cA != rB)
+            {
+                Console.WriteLine("Matrixes can't be multiplied!!");
+            }
+            float temp = 0;
+            float[,] mat = new float[rA, cB];
+
+            for (int i = 0; i < rA; i++)
+            {
+                for (int j = 0; j < cB; j++)
+                {
+                    temp = 0;
+                    for (int k = 0; k < cA; k++)
+                    {
+                        temp += A[i, k] * B[k, j];
+                    }
+                    mat[i, j] = temp;
+                }
+            }
+           
+            return mat;
+        }
+        public static float[,] AddMatrixGeneric(float[,] A, float[,] B)
+        {
+            ////-(J*V+b)/J*M*JT
+
+
+            int rA = A.GetLength(0);
+            int cA = A.GetLength(1);
+            int rB = B.GetLength(0);
+            int cB = B.GetLength(1);
+            if (cA != cB||rA!=rB)
+            {
+                Console.WriteLine("Matrixes can't be added!!");
+            }
+
+            float[,] mat = new float[rA, cB];
+
+            for (int i = 0; i < rA; i++)
+            {
+                for (int j = 0; j < cB; j++)
+                {
+                    mat[i, j] = A[i, j] + B[i, j];
+                }
+            }
+
+            return mat;
+        }
+        public static float[,] SubMatrixGeneric(float[,] A, float[,] B)
+        {
+            ////-(J*V+b)/J*M*JT
+
+
+            int rA = A.GetLength(0);
+            int cA = A.GetLength(1);
+            int rB = B.GetLength(0);
+            int cB = B.GetLength(1);
+            if (cA != cB || rA != rB)
+            {
+                Console.WriteLine("Matrixes can't be subtracted!!");
+            }
+
+            float[,] mat = new float[rA, cB];
+
+            for (int i = 0; i < rA; i++)
+            {
+                for (int j = 0; j < cB; j++)
+                {
+                    mat[i, j] = A[i, j] - B[i, j];
+                }
+            }
+
+            return mat;
+        }
+        public static float[,] MultiplyMatrix3x3(float[,] ma, float[,]mb)
+        {
+            float[,] m3x3 = new float[3, 3];
+
+            m3x3[0, 0] = ma[0, 0] * mb[0, 0] + ma[0, 1] * mb[1, 0] + ma[0, 2] * mb[2, 0];
+            m3x3[0, 1] = ma[0, 0] * mb[0, 1] + ma[0, 1] * mb[1, 1] + ma[0, 2] * mb[2, 1];
+            m3x3[0, 2] = ma[0, 0] * mb[0, 2] + ma[0, 1] * mb[1, 2] + ma[0, 2] * mb[2, 2];
+
+            m3x3[1, 0] = ma[1, 0] * mb[0, 0] + ma[1, 1] * mb[1, 0] + ma[1, 2] * mb[2, 0];
+            m3x3[1, 1] = ma[1, 0] * mb[0, 1] + ma[1, 1] * mb[1, 1] + ma[1, 2] * mb[2, 1];
+            m3x3[1, 2] = ma[1, 0] * mb[0, 2] + ma[1, 1] * mb[1, 2] + ma[1, 2] * mb[2, 2];
+
+            m3x3[2, 0] = ma[2, 0] * mb[0, 0] + ma[2, 1] * mb[1, 0] + ma[2, 2] * mb[2, 0];
+            m3x3[2, 1] = ma[2, 0] * mb[0, 1] + ma[2, 1] * mb[1, 1] + ma[2, 2] * mb[2, 1];
+            m3x3[2, 2] = ma[2, 0] * mb[0, 2] + ma[2, 1] * mb[1, 2] + ma[2, 2] * mb[2, 2];
+
+            return m3x3;
+        }
+        public static float[,] MultiplyMatrix4x3x3x3(float[,] ma, float[,] mb)
+        {
+            float[,] m4x3 = new float[4, 3];
+
+            m4x3[0, 0] = ma[0, 0] * mb[0, 0] + ma[0, 1] * mb[1, 0] + ma[0, 2] * mb[2, 0];
+            m4x3[0, 1] = ma[0, 0] * mb[0, 1] + ma[0, 1] * mb[1, 1] + ma[0, 2] * mb[2, 1];
+            m4x3[0, 2] = ma[0, 0] * mb[0, 2] + ma[0, 1] * mb[1, 2] + ma[0, 2] * mb[2, 2];
+
+            m4x3[1, 0] = ma[1, 0] * mb[0, 0] + ma[1, 1] * mb[1, 0] + ma[1, 2] * mb[2, 0];
+            m4x3[1, 1] = ma[1, 0] * mb[0, 1] + ma[1, 1] * mb[1, 1] + ma[1, 2] * mb[2, 1];
+            m4x3[1, 2] = ma[1, 0] * mb[0, 2] + ma[1, 1] * mb[1, 2] + ma[1, 2] * mb[2, 2];
+
+            m4x3[2, 0] = ma[2, 0] * mb[0, 0] + ma[2, 1] * mb[1, 0] + ma[2, 2] * mb[2, 0];
+            m4x3[2, 1] = ma[2, 0] * mb[0, 1] + ma[2, 1] * mb[1, 1] + ma[2, 2] * mb[2, 1];
+            m4x3[2, 2] = ma[2, 0] * mb[0, 2] + ma[2, 1] * mb[1, 2] + ma[2, 2] * mb[2, 2];
+
+            m4x3[3, 0] = ma[3, 0] * mb[0, 0] + ma[3, 1] * mb[1, 0] + ma[3, 2] * mb[2, 0];
+            m4x3[3, 1] = ma[3, 0] * mb[0, 1] + ma[3, 1] * mb[1, 1] + ma[3, 2] * mb[2, 1];
+            m4x3[3, 2] = ma[3, 0] * mb[0, 2] + ma[3, 1] * mb[1, 2] + ma[3, 2] * mb[2, 2];
+
+            return m4x3;
+        }
+        public static float[,] MultiplyMatrix3x4x4x3(float[,] ma, float[,] mb)
+        {
+            float[,] m3x3 = new float[3, 3];
+
+            m3x3[0, 0] = ma[0, 0] * mb[0, 0] + ma[0, 1] * mb[1, 0] + ma[0, 2] * mb[2, 0] + ma[0, 3] * mb[3, 0];
+            m3x3[0, 1] = ma[0, 0] * mb[0, 1] + ma[0, 1] * mb[1, 1] + ma[0, 2] * mb[2, 1] + ma[0, 3] * mb[3, 1];
+            m3x3[0, 2] = ma[0, 0] * mb[0, 2] + ma[0, 1] * mb[1, 2] + ma[0, 2] * mb[2, 2] + ma[0, 3] * mb[3, 2];
+
+            m3x3[1, 0] = ma[1, 0] * mb[0, 0] + ma[1, 1] * mb[1, 0] + ma[1, 2] * mb[2, 0] + ma[1, 3] * mb[3, 0];
+            m3x3[1, 1] = ma[1, 0] * mb[0, 1] + ma[1, 1] * mb[1, 1] + ma[1, 2] * mb[2, 1]+ ma[1, 3] * mb[3, 1];
+            m3x3[1, 2] = ma[1, 0] * mb[0, 2] + ma[1, 1] * mb[1, 2] + ma[1, 2] * mb[2, 2]+ ma[1, 3] * mb[3, 2];
+
+            m3x3[2, 0] = ma[2, 0] * mb[0, 0] + ma[2, 1] * mb[1, 0] + ma[2, 2] * mb[2, 0] + ma[2, 3] * mb[3, 0];
+            m3x3[2, 1] = ma[2, 0] * mb[0, 1] + ma[2, 1] * mb[1, 1] + ma[2, 2] * mb[2, 1]+ ma[2, 3] * mb[3, 1];
+            m3x3[2, 2] = ma[2, 0] * mb[0, 2] + ma[2, 1] * mb[1, 2] + ma[2, 2] * mb[2, 2]+ ma[2, 3] * mb[3, 2];
+
+           
+
+            return m3x3;
         }
         public static Vector3 Cross(Vector3 u, Vector3 v)
         {

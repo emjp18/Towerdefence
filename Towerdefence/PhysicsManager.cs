@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms.VisualStyles;
+using Microsoft.VisualBasic.FileIO;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Media;
+using SharpDX.MediaFoundation;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement.Tab;
 
 namespace Towerdefence
@@ -20,6 +23,12 @@ namespace Towerdefence
         public float alpha;
         public Vector3 n3;
         public float[,] J;
+        public float penetrationdepth;
+        public Vector2 n2;
+        public Vector2 rb2;
+        public Vector2 ra2;
+        public float d;
+        public float accum;
     }
     public struct OBB
     {
@@ -144,19 +153,58 @@ namespace Towerdefence
             return true;
         }
        
-        public void SequentialImpulse(GameObject o, PositionConstraint constraint)
+        public void Impulse(GameObject a,GameObject b ,ref PositionConstraint constraint, float dt)
         {
-            /*
-             * A = J @ M @ J.T 
-             B = -q - J @ V
+            if (constraint.d >= 0)
+                return;
+           
+            float bias = 0.5f / dt * constraint.penetrationdepth;
 
-             l = B / A
-             */
+            float kNormal = a.GetInvMassMatrix()[0, 0] + b.GetInvMassMatrix()[0, 0];
+            Vector3 rnA = Vector3.Cross(constraint.ra3, constraint.n3);
+            Vector3 rnB = Vector3.Cross(constraint.rb3, constraint.n3);
+            kNormal += Vector3.Dot(a.GetInvIntertiaMatrix()[0, 0] * rnA, rnA) + Vector3.Dot(b.GetInvIntertiaMatrix()[0, 0] * rnB, rnB);
+            Vector3 v1 = new Vector3(a.GetVelocity().X, a.GetVelocity().Y, a.GetAngularVelocity());
+            Vector3 v2 = new Vector3(b.GetVelocity().X, b.GetVelocity().Y, b.GetAngularVelocity());
+            // Save inverse of J(M^-1)(J^T).
+            float normalmass = 1.0f / kNormal;
 
-            float[,] Minv = o.GetInvMassMatrix();
-            float[,] JT = constraint.J;
-            float[,] A = new float[4, 4] { { }, { }, { }, { } }
+            Vector2 dv = (b.GetVelocity()+constraint.rb2 - a.GetVelocity()-constraint.ra2);
+               
+
+            float jnV = Vector2.Dot(dv, constraint.n2);// dv.dot(normal);
+            float vinitial = Vector3.Dot(v1 - v2, constraint.n3);
+            float vfinal = jnV + bias;
+            float restitution = vfinal / vinitial;
+
+            float lambda = -jnV + 0.5f / dt + (-restitution * (jnV)) * normalmass;
+
+            float oldAccumI = constraint.accum;
+            constraint.accum += lambda;
+
+            if (constraint.accum < 0)
+            {
+                constraint.accum = 0;
+            }
+            // Find real lambda
+            float I = constraint.accum - oldAccumI;
+
+            // Calculate linear impulse
+            Vector2 nLinearI = constraint.n2 * I;
+
+            // Calculate angular impulse
+
+            Vector3 nAngularIA = rnA * I;
+            Vector3 nAngularIB = rnB * I;
+
+            // Apply linear impulse
+            a.AddForce(-a.GetInvMassMatrix()[0, 0] * nLinearI);
+            b.AddForce(b.GetInvMassMatrix()[0, 0] * nLinearI);
+
+            
+
         }
+        
         public bool Line(ref List<Vector2> simplex, ref Vector2 direction)
         {
             Vector2 a = simplex[0];
@@ -329,15 +377,22 @@ namespace Towerdefence
             Vector3 n3 = new Vector3(n.X, n.Y, 0);
             Vector3 ra3crn3 = Vector3.Cross(ra3, n3);
             Vector3 rb3crn3 = Vector3.Cross(rb3, n3);
-            float[,] J = new float[4, 3]{ { n3.X,n3.Y,0},{ ra3crn3.X, ra3crn3.Y, ra3crn3.Z },
-                { -n3.X, -n3.Y, 0 },{-rb3crn3.X,-rb3crn3.Y,-rb3crn3.Z } };
+            float[,] J = new float[12, 1]{ {n3.X },{n3.Y },{0 },{ra3crn3.X },{ ra3crn3.Y},{ra3crn3.Z },
+                {-n3.X },{ -n3.Y},{0  },{-rb3crn3.X },{ -rb3crn3.Y},{-rb3crn3.Z } };
 
+           
             pc.ra3 = ra3;
             pc.J = J;
             pc.beta = beta;
             pc.alpha = alpha;
             pc.n3 = n3;
             pc.rb3 = rb3;
+            pc.penetrationdepth = mtv.Length();
+            pc.n2 = n;
+            pc.ra2 = ra;
+            pc.rb2 = rb;
+            pc.d = Vector2.Dot(((obbA.center + ra) - obbB.center + rb), n);
+            pc.accum = 0;
             return pc;
         }
         public bool GJK(OBB obbA, OBB obbB)

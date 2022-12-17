@@ -17,7 +17,7 @@ namespace Towerdefence
         int width = 800;
         int height = 600;
 
-     
+        GameObject testobject = new Item("", new Rectangle(1, 1, 1, 1), 10, 30);
 
         public Game1()
         {
