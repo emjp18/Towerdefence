@@ -31,6 +31,7 @@ namespace Towerdefence
         Vector2 contactPoint;
         Vector2 r;
         OBB obb;
+        Vector2 origin;
         public GameObject(string tex, Rectangle rect,float mass, int id, float speed = 0 ) 
         {
 
@@ -89,8 +90,11 @@ namespace Towerdefence
             obb.BottomLeft = obb.center - obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
             obb.TopLeft = obb.center + obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
             obb.TopRight = obb.center + obb.UpDir * (obb.Height * 0.5f) - obb.LeftDir * (obb.Width * 0.5f);
-
+            rect.Location = obb.TopLeft.ToPoint();
+            origin = new Vector2(rect.Width / 2.0f, rect.Height / 2.0f);
         }
+        public void SetVelocity(Vector2 velocity) { this.velocity=velocity; }
+        public Vector2 GetOrigin() { return origin; }
         public float GetOrientation() { return orientation; }
         public Vector2 GetVelocity() { return velocity; }
         public float GetAngularVelocity() { return angularVelocity; }
@@ -121,12 +125,14 @@ namespace Towerdefence
             //must happen before the collision function.
             this.force += force;
 
+            //AddTorque(r.X * force.Y - r.Y * force.X);
             //torque += r.X * force.Y - r.Y * force.X;
         }
         public void AddTorque(float t)
         {
             torque+= t;
         }
+        public void BypassVelocity(Vector2 vel, float angular) { velocity += vel; angularVelocity += angular; }
         public Vector2 GetPos() { return pos; }
         public OBB getOBB() { return obb; }
         public virtual void Update(GameTime gametime)
@@ -148,6 +154,8 @@ namespace Towerdefence
             obb.BottomLeft = obb.center - obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
             obb.TopLeft = obb.center + obb.UpDir * (obb.Height * 0.5f) + obb.LeftDir * (obb.Width * 0.5f);
             obb.TopRight = obb.center + obb.UpDir * (obb.Height * 0.5f) - obb.LeftDir * (obb.Width * 0.5f);
+            rect.Location = obb.TopLeft.ToPoint();
+
         }
        
         public virtual void Draw(SpriteBatch sb)

@@ -349,6 +349,18 @@ namespace Towerdefence
         {
             return new Vector2(s * v.Y, -s * v.X);
         }
+        public static Vector2 TripleCross(Vector2 a, Vector2 b, Vector2 c)
+        {
+
+            //ay*(bx*cy-by*cx)
+            //ax*(by*cx-bx*cy)
+            Vector2 resutl = (b * Vector2.Dot(c, a)) - (a * Vector2.Dot(c, b)); //new Vector2(a.Y * (b.X * c.Y - b.Y * c.X), a.X * (b.Y * c.X - b.X * c.Y));
+
+            return resutl;
+
+
+
+        }
     }
 
     

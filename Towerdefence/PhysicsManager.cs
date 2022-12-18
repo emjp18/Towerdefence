@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms.VisualStyles;
@@ -181,8 +182,8 @@ namespace Towerdefence
                 for (int i = 0; i < constraints.Count; i++)
                 {
                     PositionConstraint c = constraints[i];
-                    if (c.d >= 0)
-                        continue;
+                    //if (c.d >= 0)
+                    //    continue;
                     Vector2 ra = c.ra2;
                     Vector2 rb = c.rb2;
 
@@ -232,14 +233,15 @@ namespace Towerdefence
                     float rnB = MatrixMath.Cross(c.rb2, c.n2);
                     float nAngularIA = rnA * I;
                     float nAngularIB = rnB * I;
-
+                  
                     // Apply linear impulse
-                    a.AddForce(-invMassA * nLinearI);
-                    b.AddForce(invMassB * nLinearI);
+                    a.BypassVelocity(-invMassA * nLinearI, -invIA * nAngularIA);
+                    b.BypassVelocity(invMassB * nLinearI, invIB * nAngularIB);
 
                     //// Apply angular impulse
-                    a.AddTorque(-invIA * nAngularIA);
-                    b.AddTorque(invIB * nAngularIB);
+                    //a.AddTorque();
+                    //b.AddTorque();
+                    //c.d = Vector2.Dot(((a.getOBB().center + ra) - b.getOBB().center + rb), c.n2);
                     constraints[i] = c;
 
                 }
@@ -277,7 +279,24 @@ namespace Towerdefence
 
 
         }
+        public void ConstrainWindowBounds(GameObject o )
+        {
+            Vector2 vel = o.GetVelocity();
+            if (o.getOBB().BottomLeft.Y>Game1.width
+                ||o.getOBB().TopLeft.Y<0
+                )
+            {
+                vel.Y *= -1;
+                o.SetVelocity(vel);
+            }
 
+            if (o.getOBB().BottomRight.X > Game1.width
+                || o.getOBB().BottomLeft.X < 0)
+            {
+                vel.X *= -1;
+                o.SetVelocity(vel);
+            }
+        }
         public bool Line(ref List<Vector2> simplex, ref Vector2 direction)
         {
             Vector2 a = simplex[0];
@@ -286,12 +305,16 @@ namespace Towerdefence
             Vector2 ao = -a;
             if (SameDirection(ab, ao))
             {
-                Vector3 ab3 = new Vector3(ab.X, ab.Y, 0);
-                Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
-                Vector3 cross = MatrixMath.Cross(ab3, ao3);
-                Vector3 dir3 = MatrixMath.Cross(cross, ab3);
-                direction.X = dir3.X;
-                direction.Y = dir3.Y;
+                //Vector3 ab3 = new Vector3(ab.X, ab.Y, 0);
+                //Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
+                direction = MatrixMath.TripleCross(ab, ao, ab);
+                direction = direction;
+                //Vector3 triplecross = Vector3.Cross(Vector3.Cross(ab3, ao3), ab3);
+                //direction.X = triplecross.X;
+                //direction.Y = triplecross.Y;
+                //direction.X = -ab.Y;
+                //direction.Y = ab.X;
+
             }
             else
             {
@@ -318,12 +341,13 @@ namespace Towerdefence
             Vector2 ab = b - a;
             Vector2 ac = c - a;
             Vector2 ao = -a;
-            Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
+            //Vector3 ao3 = new Vector3(ao.X, ao.Y, 0);
             Vector3 ab3 = new Vector3(ab.X, ab.Y, 0);
             Vector3 ac3 = new Vector3(ac.X, ac.Y, 0);
             Vector3 abc = Vector3.Cross(ab3, ac3);
-            Vector3 cross = Vector3.Cross(abc, ac3);
-            if (SameDirection(new Vector2(cross.X, cross.Y), ao))
+            //Vector3 cross = Vector3.Cross(abc, ac3);
+            //Vector2 cross2;
+            if (SameDirection(MatrixMath.TripleCross(ab, ac, ac),ao))
             {
                 if (SameDirection(ac, ao))
                 {
@@ -331,8 +355,10 @@ namespace Towerdefence
                     simplex.Add(a);
                     simplex.Add(c);
 
-                    cross = Vector3.Cross(Vector3.Cross(ac3, ao3), ac3);
-                    direction = new Vector2(cross.X, cross.Y);
+                    //cross = Vector3.Cross(Vector3.Cross(ac3, ao3), ac3);
+                    //direction = new Vector2(cross.X, cross.Y);
+
+                    direction = MatrixMath.TripleCross(ac, ao, ac);
                 }
                 else
                 {
@@ -344,8 +370,9 @@ namespace Towerdefence
             }
             else
             {
-                cross = Vector3.Cross(Vector3.Cross(ab3, abc), ao3);
-                if (SameDirection(new Vector2(cross.X, cross.Y), ao))
+                //cross = Vector3.Cross(Vector3.Cross(ab3, abc), ao3);
+                //cross2 = MatrixMath.TripleCross(ab, abc, ao);
+                if (SameDirection(MatrixMath.TripleCross(ab, ab, ac), ao))
                 {
                     simplex.Clear();
                     simplex.Add(a);
@@ -375,19 +402,74 @@ namespace Towerdefence
         public bool EvolveSimplex(OBB obbA, OBB obbB, ref List<Vector2> simplex, ref Vector2 direction)
         {
 
-            switch (simplex.Count)
-            {
-                case 2:
-                    {
-                        return Line(ref simplex, ref direction);
+            //switch (simplex.Count)
+            //{
+            //    case 2:
+            //        {
+            //            return Line(ref simplex, ref direction);
 
-                    }
-                case 3:
+            //        }
+            //    case 3:
+            //        {
+            //            return Triangle(ref simplex, ref direction);
+            //        }
+            //}
+            //return false;
+
+
+            Vector2 a = simplex[simplex.Count() - 1];
+            // compute AO (same thing as -A)
+            Vector2 ao = -a;
+            if (simplex.Count() == 3)
+            {
+                // then its the triangle case
+                // get b and c
+                Vector2 b = simplex[1];
+                Vector2 c = simplex[0];
+                // compute the edges
+                Vector2 ab = b - a;
+                Vector2 ac = c - a;
+                // compute the normals
+                Vector2 abPerp = MatrixMath.TripleCross(ac, ab, ab);
+                Vector2 acPerp = MatrixMath.TripleCross(ab, ac, ac);
+                // is the origin in R4
+                if (SameDirection(abPerp,ao)) {
+                    // remove point c
+                   
+                    simplex.RemoveAt(2);
+                    // set the new direction to abPerp
+                    direction = abPerp;
+                } else
+                {
+                    // is the origin in R3
+                    if (SameDirection(acPerp, ao)) {
+                        // remove point b
+                        simplex.RemoveAt(1);
+                        // set the new direction to acPerp
+                        direction = acPerp;
+                    } else
                     {
-                        return Triangle(ref simplex, ref direction);
+                        // otherwise we know its in R5 so we can return true
+                        return true;
                     }
+                }
+            }
+            else
+            {
+                // then its the line segment case
+                Vector2 b = simplex[0];
+                // compute AB
+                Vector2 ab = b - a;
+                // get the perp to AB in the direction of the origin
+                Vector2 abPerp = MatrixMath.TripleCross(ab, ao, ab);
+                // set the direction to abPerp
+                direction = abPerp;
             }
             return false;
+
+
+
+
 
 
         }
@@ -479,13 +561,14 @@ namespace Towerdefence
         public bool GJK(GameObject a, GameObject b)
         {
             List<Vector2> simplex = new List<Vector2>();
-            
-            Vector2 direction = new Vector2(1, 0);
+
+            Vector2 direction = Vector2.UnitX;
             Vector2 startsupport = Support(a.getOBB(), b.getOBB(), direction);
 
             simplex.Add(startsupport);
 
-            direction = -startsupport;
+            //direction = -startsupport;
+            direction = -direction;
             bool colliding = false;
             while (true)
             {
@@ -495,19 +578,19 @@ namespace Towerdefence
                 {
                     break;
                 }
-                List<Vector2> simplexCopy = new List<Vector2>();
-                foreach (Vector2 point in simplex)
-                {
-                    simplexCopy.Add(point);
-                }
+                //List<Vector2> simplexCopy = new List<Vector2>();
+                //foreach (Vector2 point in simplex)
+                //{
+                //    simplexCopy.Add(point);
+                //}
 
-                simplex.Clear();
+                //simplex.Clear();
+                //simplex.Add(support);
+                //foreach (Vector2 point in simplexCopy)
+                //{
+                //    simplex.Add(point);
+                //}
                 simplex.Add(support);
-                foreach (Vector2 point in simplexCopy)
-                {
-                    simplex.Add(point);
-                }
-
                 if (EvolveSimplex(a.getOBB(), b.getOBB(), ref simplex, ref direction))
                 {
                     colliding = true;

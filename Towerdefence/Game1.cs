@@ -14,11 +14,12 @@ namespace Towerdefence
         private SpriteBatch spriteBatch;
         Texture2D tex;
 
-        int width = 1920;
-        int height =1080;
+        public static int width = 1920;
+        public static int height =1080;
 
         GameObject testobject = new Item("", new Rectangle(700, 500, 50, 50), 1, 30, 0);
         GameObject testobject2 = new Item("", new Rectangle(100, 500, 50, 50), 1, 30, 1);
+       
         PhysicsManager physicsManager= new PhysicsManager();
         public Game1()
         {
@@ -53,8 +54,8 @@ namespace Towerdefence
                 Exit();
             if(Keyboard.GetState().IsKeyDown(Keys.Space))
             {
-                testobject.AddForce(new Vector2(100, 0));
-                testobject2.AddForce(new Vector2(-100, 0));
+                testobject.AddForce(testobject2.GetPos() - testobject.GetPos());
+                testobject2.AddForce(new Vector2(100, 0));
             }
             if (Keyboard.GetState().IsKeyDown(Keys.Left))
             {
@@ -76,11 +77,20 @@ namespace Towerdefence
                 testobject.AddForce(new Vector2(0, 100));
                 testobject2.AddForce(new Vector2(0, 100));
             }
-            physicsManager.GJK(testobject, testobject2);
-            physicsManager.SequentialImpulse((float)gameTime.ElapsedGameTime.TotalSeconds, testobject, testobject2);
-            System.Diagnostics.Debug.WriteLine(testobject.getOBB().TopLeft.ToString());
+
             testobject.Update(gameTime);
             testobject2.Update(gameTime);
+
+            physicsManager.ConstrainWindowBounds(testobject);
+            physicsManager.ConstrainWindowBounds(testobject2);
+
+            if (physicsManager.GJK(testobject, testobject2))
+            {
+                physicsManager.SequentialImpulse((float)gameTime.ElapsedGameTime.TotalSeconds, testobject, testobject2);
+            }
+            
+            //
+           
             base.Update(gameTime);
         }
 
@@ -89,14 +99,13 @@ namespace Towerdefence
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
             spriteBatch.Begin();
-            spriteBatch.Draw(tex, new Rectangle(testobject.getOBB().TopLeft.ToPoint(), new Point(testobject.GetRectangle().Width,
-                testobject2.GetRectangle().Height)
-                ),null, Color.White, testobject.GetOrientation(), testobject.getOBB().center, SpriteEffects.None, 0);
+            
+            spriteBatch.Draw(tex, testobject.GetRectangle()
+                ,null, Color.White, testobject.GetOrientation(), testobject.GetOrigin(), SpriteEffects.None, 0);
 
-            spriteBatch.Draw(tex, new Rectangle(testobject2.getOBB().TopLeft.ToPoint(), new Point(testobject2.GetRectangle().Width,
-                testobject2.GetRectangle().Height)
-                ), null, Color.White, testobject2.GetOrientation(), testobject2.getOBB().center, SpriteEffects.None, 0);
-
+            spriteBatch.Draw(tex, testobject2.GetRectangle(), null, Color.White, testobject2.GetOrientation(), 
+                testobject2.GetOrigin(), SpriteEffects.None, 0);
+       
             spriteBatch.End();
             base.Draw(gameTime);
         }
