@@ -81,15 +81,25 @@ namespace Towerdefence
             testobject.Update(gameTime);
             testobject2.Update(gameTime);
 
-           
-
-            if (physicsManager.GJK(testobject, testobject2))
+            for(int i = 0; i < ResourceManager.GetGameObjectsCount(); i++) // replace this with a quad tree
             {
-                physicsManager.SequentialImpulse((float)gameTime.ElapsedGameTime.TotalSeconds, testobject, testobject2);
+                for (int j = 0; j < ResourceManager.GetGameObjectsCount(); j++)
+                {
+                    if (i == j)
+                        continue;
+
+                    physicsManager.GJK(ResourceManager.GetGameObject(i), ResourceManager.GetGameObject(j));
+                }
             }
 
-            physicsManager.ConstrainWindowBounds(testobject);
-            physicsManager.ConstrainWindowBounds(testobject2);
+            physicsManager.SequentialImpulse((float)gameTime.ElapsedGameTime.TotalSeconds);
+
+
+            physicsManager.ApplyFriction((float)gameTime.ElapsedGameTime.TotalSeconds);
+            physicsManager.ResetConstraints();
+
+            physicsManager.ConstrainWindowBounds();
+           
 
             base.Update(gameTime);
         }

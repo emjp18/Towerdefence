@@ -63,6 +63,7 @@ namespace Towerdefence
     {
         List<PositionConstraint> constraints = new List<PositionConstraint>();
         public int numIterations = 10;
+        public float friction =1f;
         public bool CircleCircleCollision(ref GameObject a, ref GameObject b)
         {
             float x = a.GetRectangle().Center.X - b.GetRectangle().Center.X;
@@ -168,13 +169,47 @@ namespace Towerdefence
 
             return true;
         }
-      
-    public void SequentialImpulse(float dt, GameObject a, GameObject b)
+     public void ResetConstraints() { constraints.Clear(); }
+        public void ApplyFriction(float dt)
+        {
+            for(int i=0; i<constraints.Count; i++)
+            {
+                PositionConstraint c = constraints[i];
+                GameObject a = ResourceManager.GetGameObject(c.IDA);
+                GameObject b = ResourceManager.GetGameObject(c.IDB);
+
+                Vector2 rv = b.GetVelocity() - a.GetVelocity();
+                // Solve for the tangent vector 
+                Vector2 tangent = rv - Vector2.Dot(rv, c.n2) * c.n2;
+                tangent.Normalize();
+                float velAlongNormal = Vector2.Dot(rv, tangent);
+                // Solve for magnitude to apply along the friction vector 
+                float jt = -Vector2.Dot(rv, tangent);
+                jt = jt / (1 / a.Getmass() + 1 / b.Getmass());
+                float j = -(1 + 0.1f) * velAlongNormal;
+                j /= 1 / a.Getmass() + 1 / b.Getmass();
+                float mu = friction;
+                Vector2 frictionImpulse;
+                if (MathF.Abs(jt) < j * mu)
+                    frictionImpulse = jt * tangent;
+                else
+                {
+
+                    frictionImpulse = -j * tangent * friction;
+                }
+                a.BypassVelocity((1 / a.Getmass()) * frictionImpulse, 0, dt);
+                b.BypassVelocity((-1 / b.Getmass()) * frictionImpulse, 0, dt);
+
+            }
+
+
+
+
+
+        }
+    public void SequentialImpulse(float dt)
         {
             
-
-            
-
             float k_slop = 0.004f;
             float k_biasFactor = 0.1f;
             for(int j=0; j<numIterations; j++)
@@ -182,11 +217,13 @@ namespace Towerdefence
                 for (int i = 0; i < constraints.Count; i++)
                 {
                     PositionConstraint c = constraints[i];
-                    //if (c.d >= 0)
-                    //    continue;
+                    if (c.penetrationdepth <= float.Epsilon)
+                        continue;
+                    GameObject a = ResourceManager.GetGameObject(c.IDA);
+                    GameObject b = ResourceManager.GetGameObject(c.IDB);
                     Vector2 ra = c.ra2;
                     Vector2 rb = c.rb2;
-
+                   
                     float invMassA = 1.0f / c.massA;
                     float invMassB = 1.0f / c.massB;
                     float massLinear = invMassA + invMassB;
@@ -235,19 +272,16 @@ namespace Towerdefence
                     float nAngularIB = rnB * I;
                   
                     // Apply linear impulse
-                    a.BypassVelocity(-invMassA * nLinearI, -invIA * nAngularIA);
-                    b.BypassVelocity(invMassB * nLinearI, invIB * nAngularIB);
+                    a.BypassVelocity(-invMassA * nLinearI, -invIA * nAngularIA,dt);
+                    b.BypassVelocity(invMassB * nLinearI, invIB * nAngularIB,dt);
+                    
 
-                    //// Apply angular impulse
-                    //a.AddTorque();
-                    //b.AddTorque();
-                    //c.d = Vector2.Dot(((a.getOBB().center + ra) - b.getOBB().center + rb), c.n2);
                     constraints[i] = c;
 
                 }
 
             }
-            constraints.Clear();
+
 
 
             /*
@@ -279,23 +313,28 @@ namespace Towerdefence
 
 
         }
-        public void ConstrainWindowBounds(GameObject o )
+        public void ConstrainWindowBounds( )
         {
-            Vector2 vel = o.GetVelocity();
-            if (o.getOBB().BottomLeft.Y>Game1.width
-                ||o.getOBB().TopLeft.Y<0
-                )
+            for (int i=0; i<ResourceManager.GetGameObjectsCount(); i++)
             {
-                vel.Y *= -1;
-                o.SetVelocity(vel);
-            }
+                GameObject o = ResourceManager.GetGameObject(i);
+                Vector2 vel = o.GetVelocity();
+                if (o.getOBB().BottomLeft.Y > Game1.height
+                    || o.getOBB().TopLeft.Y < 0
+                    )
+                {
+                    vel.Y *= -1;
+                    o.SetVelocity(vel);
+                }
 
-            if (o.getOBB().BottomRight.X > Game1.width
-                || o.getOBB().BottomLeft.X < 0)
-            {
-                vel.X *= -1;
-                o.SetVelocity(vel);
+                if (o.getOBB().BottomRight.X > Game1.width
+                    || o.getOBB().BottomLeft.X < 0)
+                {
+                    vel.X *= -1;
+                    o.SetVelocity(vel);
+                }
             }
+            
         }
         public bool Line(ref List<Vector2> simplex, ref Vector2 direction)
         {
@@ -510,10 +549,10 @@ namespace Towerdefence
             return a - b;
 
         }
-        public PositionConstraint CreatePositionConstraint(OBB obbA, OBB obbB, GameObject a, GameObject b,Vector2 mtv)
+        public PositionConstraint CreatePositionConstraint(OBB obbA, OBB obbB, GameObject a, GameObject b,Vector2 mtv, Vector2 origin)
         {
             PositionConstraint pc = new PositionConstraint();
-            Vector2 contactpointA = obbA.center - mtv;
+            Vector2 contactpointA = obbA.center + mtv;
             Vector2 contactpointB = -contactpointA;
             obbA.UpDir.Normalize();
             obbB.UpDir.Normalize();
@@ -556,6 +595,8 @@ namespace Towerdefence
             pc.massB = b.Getmass();
             pc.inertiaA = a.GetInertia();
             pc.inertiaB = b.GetInertia();
+            pc.IDA = a.GetID();
+            pc.IDB = b.GetID(); 
             return pc;
         }
         public bool GJK(GameObject a, GameObject b)
@@ -600,8 +641,8 @@ namespace Towerdefence
             }
             if (colliding)
             {
-                Vector2 mtv = EPA(a.getOBB(), b.getOBB(), simplex);
-                constraints.Add(CreatePositionConstraint(a.getOBB(), b.getOBB(),a,b, mtv));
+                  Vector2 mtv = EPA(a.getOBB(), b.getOBB(), simplex);
+                constraints.Add(CreatePositionConstraint(a.getOBB(), b.getOBB(),a,b, mtv, simplex[simplex.Count()-1]));
             }
 
             return colliding;

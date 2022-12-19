@@ -132,7 +132,12 @@ namespace Towerdefence
         {
             torque+= t;
         }
-        public void BypassVelocity(Vector2 vel, float angular) { velocity += vel; angularVelocity += angular; }
+        public void BypassVelocity(Vector2 vel, float angular, float dt) {
+            
+            velocity += vel * dt;
+            angularVelocity += angular * dt;
+           
+        }
         public Vector2 GetPos() { return pos; }
         public OBB getOBB() { return obb; }
         public virtual void Update(GameTime gametime)
@@ -146,7 +151,7 @@ namespace Towerdefence
             orientation += angularVelocity * dt;
             force = Vector2.Zero;
             torque = 0;
-
+            
             obb.center = pos;
             obb.UpDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitY);
             obb.LeftDir = MatrixMath.TransformVector2x2(MatrixMath.GetRotationMatrix2x2(orientation), -Vector2.UnitX);

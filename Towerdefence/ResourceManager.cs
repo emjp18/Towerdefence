@@ -10,7 +10,7 @@ namespace Towerdefence
     {
        static List<GameObject> allGameObjects = new List<GameObject>();
 
-
+        public static int GetGameObjectsCount() { return allGameObjects.Count; }
         public static void SetGO(GameObject go) { allGameObjects.Add(go); }
         public static GameObject GetGameObject(int id) { return allGameObjects[id]; }
     }
