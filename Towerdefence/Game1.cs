@@ -81,16 +81,16 @@ namespace Towerdefence
             testobject.Update(gameTime);
             testobject2.Update(gameTime);
 
-            physicsManager.ConstrainWindowBounds(testobject);
-            physicsManager.ConstrainWindowBounds(testobject2);
+           
 
             if (physicsManager.GJK(testobject, testobject2))
             {
                 physicsManager.SequentialImpulse((float)gameTime.ElapsedGameTime.TotalSeconds, testobject, testobject2);
             }
-            
-            //
-           
+
+            physicsManager.ConstrainWindowBounds(testobject);
+            physicsManager.ConstrainWindowBounds(testobject2);
+
             base.Update(gameTime);
         }
 
